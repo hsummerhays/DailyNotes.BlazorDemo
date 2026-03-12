@@ -1,0 +1,62 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Publish API
+      run: dotnet publish DailyNotes.Api/DailyNotes.Api.csproj -c Release -o ./publish-api
+
+    - name: Deploy API to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'app-dailynotes-api-hsh' 
+        publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
+        package: ./publish-api
+
+    - name: Publish Blazor
+      run: dotnet publish DailyNotes.Blazor/DailyNotes.Blazor.csproj -c Release -o ./publish-blazor
+
+    - name: Deploy Blazor to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'app-dailynotes-blazor-hsh'
+        publish-profile: ${{ secrets.AZURE_BLAZOR_PUBLISH_PROFILE }}
+        package: ./publish-blazor

@@ -1,0 +1,81 @@
+@using DailyNotes.Blazor.Components.UI
+@inherits LayoutComponentBase
+
+<div class="app-layout">
+    <aside class="sidebar @(_isSidebarOpen ? "open" : "")">
+        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--color-sidebar-border); display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="font-size: 1.25rem; font-weight: 800; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.025em;">
+                DailyNotes
+            </h1>
+            <button class="mobile-toggle" @onclick="ToggleSidebar">✕</button>
+        </div>
+
+        <nav style="flex: 1; padding: 0.75rem 0; overflow-y: auto;">
+            <NavMenu />
+        </nav>
+
+        <div style="padding: 1.25rem 1rem; border-top: 1px solid var(--color-sidebar-border); background: rgba(0,0,0,0.02);">
+            <ThemeToggle />
+            <div style="margin-top: 1.25rem;">
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="MicrosoftIdentity/Account/SignOut" class="btn btn-secondary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: flex; align-items: center;">
+                            Sign Out
+                        </a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/MicrosoftIdentity/Account/SignIn" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; font-weight: 600;">
+                            Sign In
+                        </a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <button class="mobile-header-btn" @onclick="ToggleSidebar">☰</button>
+        <div class="page-container">
+            @Body
+        </div>
+    </main>
+</div>
+
+<style>
+    .mobile-toggle {
+        display: none;
+        background: transparent;
+        border: none;
+        color: var(--color-text-sidebar);
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+
+    .mobile-header-btn {
+        display: none;
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 50;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        color: var(--color-text);
+        padding: 0.5rem;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+    }
+
+    @@media (max-width: 768px) {
+        .mobile-toggle { display: block; }
+        .mobile-header-btn { display: block; }
+    }
+</style>
+
+@code {
+    private bool _isSidebarOpen = false;
+
+    private void ToggleSidebar()
+    {
+        _isSidebarOpen = !_isSidebarOpen;
+    }
+}

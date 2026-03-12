@@ -1,0 +1,107 @@
+<div class="nav-items-wrapper">
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="" Match="NavLinkMatch.All">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Dashboard</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="work-days">
+            <span class="nav-icon">📅</span>
+            <span class="nav-label">Work Days</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="tasks">
+            <span class="nav-icon">✅</span>
+            <span class="nav-label">Tasks</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="projects">
+            <span class="nav-icon">📁</span>
+            <span class="nav-label">Projects</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="notes">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">Notes</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="topics">
+            <span class="nav-icon">📚</span>
+            <span class="nav-label">Topics</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="knowledge">
+            <span class="nav-icon">🧠</span>
+            <span class="nav-label">Knowledge</span>
+        </NavLink>
+    </div>
+    <div class="nav-item">
+        <NavLink class="nav-link-custom" href="assignments">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">Assignments</span>
+        </NavLink>
+    </div>
+    <div class="nav-item" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+        <NavLink class="nav-link-custom" href="diagnostics">
+            <span class="nav-icon">🛠️</span>
+            <span class="nav-label">Diagnostics</span>
+        </NavLink>
+    </div>
+</div>
+
+<style>
+    .nav-items-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .nav-link-custom {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.85rem 1.25rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.9375rem;
+        color: var(--color-text-sidebar);
+        opacity: 0.85;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        margin: 0.25rem 0.75rem;
+    }
+
+    .nav-label {
+        color: inherit;
+        font-weight: 500;
+    }
+
+    .nav-link-custom:hover {
+        background: var(--color-sidebar-item-hover);
+        opacity: 1;
+        transform: translateX(4px);
+    }
+
+    .nav-link-custom.active {
+        background: var(--color-primary);
+        color: #ffffff !important;
+        opacity: 1;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+        border-left: 4px solid var(--color-accent);
+    }
+
+    .nav-icon {
+        font-size: 1.25rem;
+        transition: transform 0.2s ease;
+    }
+    
+    .nav-link-custom:hover .nav-icon {
+        transform: scale(1.15);
+    }
+</style>

@@ -1,0 +1,196 @@
+@inherits AuthenticatedBaseComponent
+@page "/work-days"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Work Days - DailyNotes</PageTitle>
+
+<div class="page-header"
+    style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 600;">Work Days</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.875rem;">Track your daily work sessions</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        @foreach (var filter in new[] { "This Month", "Last Month", "All" })
+        {
+            <button class="btn @(_currentFilter == filter ? "btn-primary" : "btn-secondary")"
+            @onclick="() => SetFilter(filter)" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+                @filter
+            </button>
+        }
+        <button class="btn btn-primary" @onclick="() => _isClockInModalOpen = true">Clock In</button>
+        <button class="btn btn-secondary" @onclick="() => _isManualEntryModalOpen = true">+ Manual Entry</button>
+    </div>
+</div>
+
+<div class="page-content">
+    @if (IsLoading)
+    {
+        <div style="display: flex; justify-content: center; padding: 3rem;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger"
+            style="padding: 1rem; margin-bottom: 2rem; border-radius: 8px; background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #dc3545;">
+            <h4 style="margin: 0 0 0.5rem 0;">API Error</h4>
+            <p style="margin: 0; font-size: 0.9rem;">@ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        @if (_todayWorkDay != null && _todayWorkDay.TimeOut1 == null)
+        {
+            <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--color-success);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="font-weight: 600;">Today — @_todayWorkDay.WorkDate.ToString("MMMM d")</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <Badge Type="Badge.BadgeType.Success">Active</Badge>
+                        <button class="btn btn-secondary" style="padding: 0.3rem 0.7rem; font-size: 0.75rem;">Edit</button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                    @MiniStat("Time In", _todayWorkDay.TimeIn1?.ToString("hh:mm tt") ?? "—")
+                    @MiniStat("Time Out", "—")
+                    @MiniStat("Breaks", $"{_todayWorkDay.BreakMinutes} min")
+                    @MiniStat("Hours", CalculateHours(_todayWorkDay).ToString("F1"))
+                </div>
+            </div>
+        }
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            @foreach (var day in _filteredWorkDays)
+            {
+                <div class="card" style="padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-weight: 500;">@day.WorkDate.ToString("dddd, MMM d, yyyy")</span>
+                            <span style="margin-left: 1rem; font-size: 0.8rem; color: var(--color-text-muted);">
+                                @day.TimeIn1?.ToString("hh:mm tt") → @(day.TimeOut1?.ToString("hh:mm tt") ?? "...")
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <span style="font-weight: 600; color: var(--color-accent); min-width: 3rem; text-align: right;">
+                                @CalculateHours(day).ToString("F1")h
+                            </span>
+                            <button class="btn btn-secondary" style="padding: 0.3rem 0.7rem; font-size: 0.75rem;">Edit</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<Modal Title="Clock In" @bind-IsOpen="_isClockInModalOpen">
+    <p>Ready to start your work day at @DateTime.Now.ToString("t")?</p>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" @onclick="() => _isClockInModalOpen = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="HandleClockIn">Confirm Clock In</button>
+    </div>
+</Modal>
+
+<Modal Title="Manual Entry" @bind-IsOpen="_isManualEntryModalOpen">
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="form-group">
+            <label>Work Date</label>
+            <input type="date" class="form-control"
+                style="background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.5rem; border-radius: 6px; width: 100%;" />
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <div style="flex: 1;">
+                <label>Time In</label>
+                <input type="time" class="form-control"
+                    style="background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.5rem; border-radius: 6px; width: 100%;" />
+            </div>
+            <div style="flex: 1;">
+                <label>Time Out</label>
+                <input type="time" class="form-control"
+                    style="background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.5rem; border-radius: 6px; width: 100%;" />
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 2rem;">
+        <button class="btn btn-secondary" @onclick="() => _isManualEntryModalOpen = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="() => _isManualEntryModalOpen = false">Save Entry</button>
+    </div>
+</Modal>
+
+@code {
+    private string _currentFilter = "This Month";
+    private bool _isClockInModalOpen = false;
+    private bool _isManualEntryModalOpen = false;
+
+    private List<WorkDay> _workDays = new();
+    private List<WorkDay> _filteredWorkDays = new();
+    private WorkDay? _todayWorkDay;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            _workDays = await Http.GetFromJsonAsync<List<WorkDay>>("api/workdays") ?? new();
+            _todayWorkDay = _workDays.FirstOrDefault(w => w.WorkDate.Date == DateTime.Today);
+            ApplyFilter();
+        });
+    }
+
+    private void SetFilter(string filter)
+    {
+        _currentFilter = filter;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (_currentFilter == "This Month")
+        {
+            _filteredWorkDays = _workDays.Where(w => w.WorkDate.Month == DateTime.Today.Month && w.WorkDate.Year == DateTime.Today.Year).ToList();
+        }
+        else if (_currentFilter == "Last Month")
+        {
+            var lastMonth = DateTime.Today.AddMonths(-1);
+            _filteredWorkDays = _workDays.Where(w => w.WorkDate.Month == lastMonth.Month && w.WorkDate.Year == lastMonth.Year).ToList();
+        }
+        else
+        {
+            _filteredWorkDays = _workDays.ToList();
+        }
+    }
+
+    private async Task HandleClockIn()
+    {
+        _isClockInModalOpen = false;
+        await ExecuteApiCallAsync(async () =>
+        {
+            var response = await Http.PostAsync("api/workdays/clock-in", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadData();
+            }
+        });
+    }
+
+    private double CalculateHours(WorkDay day)
+    {
+        if (day.TimeIn1 == null) return 0;
+        var end = day.TimeOut1 ?? (day.WorkDate.Date == DateTime.Today ? DateTime.Now : day.TimeIn1.Value);
+        var total = (end - day.TimeIn1.Value).TotalHours;
+        return Math.Max(0, total - (day.BreakMinutes / 60.0));
+    }
+
+    private RenderFragment MiniStat(string label, string value) => __builder =>
+    {
+        <div>
+            <div style="font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+                @label</div>
+            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem;">@value</div>
+        </div>
+    };
+}

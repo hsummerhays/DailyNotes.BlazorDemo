@@ -1,0 +1,76 @@
+@implements IDisposable
+@using DailyNotes.Blazor.Services
+@inject ThemeService ThemeService
+
+<div class="theme-toggle" @attributes="AdditionalAttributes">
+    <button @onclick="() => SetTheme(AppTheme.Light)" class="toggle-btn @(ThemeService.CurrentTheme == AppTheme.Light ? "active" : "")" title="Light Mode">
+        ☀️
+    </button>
+    <button @onclick="() => SetTheme(AppTheme.Dark)" class="toggle-btn @(ThemeService.CurrentTheme == AppTheme.Dark ? "active" : "")" title="Dark Mode">
+        🌙
+    </button>
+    <button @onclick="() => SetTheme(AppTheme.Device)" class="toggle-btn @(ThemeService.CurrentTheme == AppTheme.Device ? "active" : "")" title="System Preference">
+        💻
+    </button>
+</div>
+
+<style>
+    .theme-toggle {
+        display: flex;
+        background: var(--color-bg-elevated);
+        padding: 0.25rem;
+        border-radius: var(--radius-sm);
+        gap: 0.25rem;
+        margin-top: 1rem;
+    }
+    .toggle-btn {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 0.4rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        opacity: 0.6;
+    }
+    .toggle-btn:hover {
+        opacity: 1;
+        background: var(--color-border);
+    }
+    .toggle-btn.active {
+        opacity: 1;
+        background: var(--color-bg-card);
+        color: var(--color-primary);
+        box-shadow: var(--shadow-card);
+    }
+</style>
+
+@code {
+    [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ThemeService.InitializeAsync();
+        }
+    }
+
+    private void HandleThemeChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SetTheme(AppTheme theme)
+    {
+        await ThemeService.SetThemeAsync(theme);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+}

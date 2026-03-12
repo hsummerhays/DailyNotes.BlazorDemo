@@ -1,0 +1,117 @@
+@page "/diagnostics"
+@using Microsoft.Extensions.Configuration
+@using System.Net.Http
+@inject IConfiguration Configuration
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Diagnostics - DailyNotes</PageTitle>
+
+<div class="page-header">
+    <h1 style="font-size: 1.5rem; font-weight: 600;">System Diagnostics</h1>
+    <p style="color: var(--color-text-secondary); font-size: 0.875rem;">Verify deployment configuration and connectivity</p>
+</div>
+
+<div class="page-content">
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Environment Info -->
+        <div class="card" style="padding: 1.5rem;">
+            <h3 style="font-weight: 600; margin-bottom: 1rem;">Environment</h3>
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.5rem; font-size: 0.9rem;">
+                <strong>Base URI:</strong> <span>@Navigation.BaseUri</span>
+                <strong>Is Secure (HTTPS):</strong> <span>@(Navigation.BaseUri.StartsWith("https") ? "✅ Yes" : "⚠️ No")</span>
+            </div>
+        </div>
+
+        <!-- API Configuration -->
+        <div class="card" style="padding: 1.5rem;">
+            <h3 style="font-weight: 600; margin-bottom: 1rem;">API Connectivity</h3>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.5rem; font-size: 0.9rem;">
+                    <strong>Configured Address:</strong> <span>@_apiAddress</span>
+                    <strong>Status:</strong> 
+                    <span>
+                        @if (_isCheckingApi) { <span class="spinner-small"></span> <span>Checking...</span> }
+                        else if (_apiSuccess) { <span style="color: var(--color-success);">✅ Reachable</span> }
+                        else { <span style="color: var(--color-danger);">❌ Failed: @_apiError</span> }
+                    </span>
+                </div>
+                <button class="btn btn-secondary" @onclick="CheckApi" disabled="@_isCheckingApi">Re-scan API</button>
+            </div>
+        </div>
+
+        <!-- Azure AD Configuration -->
+        <div class="card" style="padding: 1.5rem;">
+            <h3 style="font-weight: 600; margin-bottom: 1rem;">Identity Config (Azure AD)</h3>
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.5rem; font-size: 0.9rem;">
+                <strong>Instance:</strong> <span>@(Configuration["AzureAd:Instance"] ?? "❌ Missing")</span>
+                <strong>Tenant ID:</strong> <span>@Mask(Configuration["AzureAd:TenantId"])</span>
+                <strong>Client ID:</strong> <span>@Mask(Configuration["AzureAd:ClientId"])</span>
+                <strong>Callback:</strong> <span>@(Configuration["AzureAd:CallbackPath"] ?? "❌ Missing")</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .spinner-small {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: var(--color-primary);
+        animation: spin 1s ease-in-out infinite;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+    }
+</style>
+
+@code {
+    private string? _apiAddress;
+    private bool _isCheckingApi = false;
+    private bool _apiSuccess = false;
+    private string? _apiError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _apiAddress = Configuration["DailyNotesApi:BaseAddress"];
+        await CheckApi();
+    }
+
+    private async Task CheckApi()
+    {
+        _isCheckingApi = true;
+        _apiSuccess = false;
+        _apiError = null;
+        StateHasChanged();
+
+        try
+        {
+            // Try to hit the API root or a health endpoint if it existed
+            // Using a short timeout for diagnostics
+            var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var response = await Http.GetAsync("/", cts.Token);
+            _apiSuccess = response.IsSuccessStatusCode;
+            if (!_apiSuccess) _apiError = $"Status: {response.StatusCode}";
+        }
+        catch (Exception ex)
+        {
+            _apiError = ex.Message;
+        }
+        finally
+        {
+            _isCheckingApi = false;
+            StateHasChanged();
+        }
+    }
+
+    private string Mask(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "❌ Missing";
+        if (value.Length <= 8) return value;
+        return value.Substring(0, 4) + "..." + value.Substring(value.Length - 4);
+    }
+}

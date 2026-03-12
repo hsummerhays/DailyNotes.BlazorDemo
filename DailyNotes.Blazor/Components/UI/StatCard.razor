@@ -1,0 +1,29 @@
+<div class="card stat-card" @attributes="AdditionalAttributes">
+    <div class="stat-label">@Label</div>
+    <div class="stat-value" style="color: @(Accent ?? "var(--color-primary)")">@Value</div>
+</div>
+
+<style>
+    .stat-card {
+        padding: 1.25rem;
+    }
+    .stat-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+</style>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Accent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
+}

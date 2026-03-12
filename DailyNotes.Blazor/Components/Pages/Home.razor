@@ -1,0 +1,111 @@
+@inherits AuthenticatedBaseComponent
+@page "/"
+@using System.Globalization
+
+<PageTitle>Dashboard - DailyNotes</PageTitle>
+
+<div class="page-header">
+    <h1 style="font-size: 1.5rem; font-weight: 600;">@_greeting 👋</h1>
+    <p style="color: var(--color-text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+        @DateTime.Now.ToString("dddd, MMMM d, yyyy")
+    </p>
+</div>
+
+<div class="page-content">
+    @if (IsLoading)
+    {
+        <div style="display: flex; justify-content: center; padding: 3rem;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" style="padding: 1rem; margin-bottom: 2rem; border-radius: 8px; background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #dc3545;">
+            <h4 style="margin: 0 0 0.5rem 0;">API Error</h4>
+            <p style="margin: 0; font-size: 0.9rem;">@ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        <!-- Stats Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <StatCard Label="Today's Status" Value="@(_isClockedIn ? "🟢 Clocked In" : "⚪ Not Started")" Accent="#10b981" />
+            <StatCard Label="Active Tasks" Value="@_activeTasksCount.ToString()" Accent="#6366f1" />
+            <StatCard Label="Overdue" Value="@_overdueTasksCount.ToString()" Accent="@(_overdueTasksCount > 0 ? "#ef4444" : "#64748b")" />
+            <StatCard Label="Hours Today" Value="@_hoursToday.ToString("F1")" Accent="#06b6d4" />
+        </div>
+    }
+
+    <!-- Quick Actions -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap;">
+        <NavLink href="work-days" class="btn btn-primary">📅 View Today</NavLink>
+        <NavLink href="tasks" class="btn btn-secondary">✅ My Tasks</NavLink>
+        <NavLink href="notes" class="btn btn-secondary">📝 New Note</NavLink>
+        <NavLink href="search" class="btn btn-secondary">🔍 Search</NavLink>
+    </div>
+
+    <!-- Section: Recent Projects -->
+    <div style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Recent Projects</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+            @foreach (var project in _recentProjects)
+            {
+                <div class="card" style="padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="font-weight: 600; font-size: 0.95rem; margin: 0;">@project.Name</h3>
+                        <Badge Type="Badge.BadgeType.Primary" style="font-size: 0.7rem;">@project.Visibility</Badge>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+                        @project.Category
+                    </div>
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <NavLink href="projects" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">View</NavLink>
+                    </div>
+                </div>
+            }
+            @if (!_recentProjects.Any())
+            {
+                <div class="card" style="padding: 1.5rem; color: var(--color-text-muted); border-style: dashed; grid-column: 1 / -1;">
+                    <p>Ready to start your day? Clock in or browse your tasks.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _greeting = "Welcome";
+    private bool _isClockedIn = false;
+    private int _activeTasksCount = 0;
+    private int _overdueTasksCount = 0;
+    private double _hoursToday = 0.0;
+    private List<Project> _recentProjects = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var hour = DateTime.Now.Hour;
+        if (hour < 12) _greeting = "Good Morning";
+        else if (hour < 17) _greeting = "Good Afternoon";
+        else _greeting = "Good Evening";
+
+        await ExecuteApiCallAsync(async () =>
+        {
+            var tasks = await Http.GetFromJsonAsync<List<WorkTask>>("api/worktasks") ?? new();
+            _activeTasksCount = tasks.Count(t => t.Status != "completed");
+            _overdueTasksCount = tasks.Count(t => t.DueDate < DateTime.Today && t.Status != "completed");
+
+            var workDays = await Http.GetFromJsonAsync<List<WorkDay>>("api/workdays") ?? new();
+            var today = workDays.FirstOrDefault(w => w.WorkDate.Date == DateTime.Today);
+            _isClockedIn = today?.TimeIn1 != null && today.TimeOut1 == null;
+            
+            if (today?.TimeIn1 != null)
+            {
+                var end = today.TimeOut1 ?? DateTime.Now;
+                _hoursToday = (end - today.TimeIn1.Value).TotalHours;
+            }
+
+            var projects = await Http.GetFromJsonAsync<List<Project>>("api/projects") ?? new();
+            _recentProjects = projects.OrderByDescending(p => p.CreatedAt).Take(3).ToList();
+        });
+    }
+}

@@ -1,0 +1,146 @@
+@inherits AuthenticatedBaseComponent
+@page "/assignments"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Assignments - DailyNotes</PageTitle>
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 600;">Assignments</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.875rem;">Track your school or work assignments</p>
+    </div>
+    <button class="btn btn-primary" @onclick="() => _isNewModalOpen = true">+ New Assignment</button>
+</div>
+
+<div class="page-content">
+    @if (IsLoading)
+    {
+        <div style="display: flex; justify-content: center; padding: 3rem;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" style="padding: 1rem; margin-bottom: 2rem; border-radius: 8px; background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #dc3545;">
+            <h4 style="margin: 0 0 0.5rem 0;">API Error</h4>
+            <p style="margin: 0; font-size: 0.9rem;">@ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        @if (_assignments.Count == 0)
+        {
+            <div class="card" style="padding: 3rem; text-align: center; color: var(--color-text-muted);">
+                No assignments found. Add one to get started!
+            </div>
+        }
+        else
+        {
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem;">
+                @foreach (var assignment in _assignments)
+                {
+                    <div class="card" style="padding: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                            <h3 style="font-weight: 600; font-size: 1.1rem;">@assignment.Title</h3>
+                            <Badge Type="@GetStatusBadgeType(assignment.Status)">@assignment.Status</Badge>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(assignment.Description))
+                        {
+                            <p style="font-size: 0.9rem; color: var(--color-text-secondary); margin-bottom: 1rem;">@assignment.Description</p>
+                        }
+
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
+                            @if (assignment.DueDate.HasValue)
+                            {
+                                <div style="display: flex; align-items: center; gap: 0.5rem; color: @(assignment.DueDate < DateTime.Now ? "var(--color-danger)" : "inherit")">
+                                    <span>📅 Due: @assignment.DueDate.Value.ToString("MMM dd, yyyy")</span>
+                                </div>
+                            }
+                            
+                            @if (assignment.Grade.HasValue)
+                            {
+                                <div style="font-weight: 600; color: var(--color-success);">
+                                    Grade: @assignment.Grade / @assignment.MaxGrade (@(assignment.Grade / assignment.MaxGrade * 100)%)
+                                </div>
+                            }
+                        </div>
+
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" style="flex: 1; font-size: 0.8rem;">Edit</button>
+                            <button class="btn btn-secondary" style="padding: 0.4rem 0.6rem;">🗑</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<Modal Title="New Assignment" @bind-IsOpen="_isNewModalOpen">
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="text" @bind="_newAssignment.Title" placeholder="Assignment Title" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+        <textarea @bind="_newAssignment.Description" placeholder="Description" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px; min-height: 80px;"></textarea>
+        
+        <div style="display: flex; gap: 1rem;">
+            <div style="flex: 1;">
+                <label style="display: block; font-size: 0.8rem; margin-bottom: 0.3rem;">Due Date</label>
+                <input type="date" @bind="_newAssignment.DueDate" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+            </div>
+            <div style="flex: 1;">
+                <label style="display: block; font-size: 0.8rem; margin-bottom: 0.3rem;">Status</label>
+                <select @bind="_newAssignment.Status" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;">
+                    <option value="pending">Pending</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="graded">Graded</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 2rem;">
+        <button class="btn btn-secondary" @onclick="() => _isNewModalOpen = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="HandleCreate">Create Assignment</button>
+    </div>
+</Modal>
+
+@code {
+    private bool _isNewModalOpen = false;
+    private List<Assignment> _assignments = new();
+    private Assignment _newAssignment = new() { DueDate = DateTime.Today.AddDays(7) };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            _assignments = await Http.GetFromJsonAsync<List<Assignment>>("api/assignments") ?? new();
+        });
+    }
+
+    private async Task HandleCreate()
+    {
+        if (string.IsNullOrWhiteSpace(_newAssignment.Title)) return;
+
+        await ExecuteApiCallAsync(async () =>
+        {
+            var response = await Http.PostAsJsonAsync("api/assignments", _newAssignment);
+            if (response.IsSuccessStatusCode)
+            {
+                _isNewModalOpen = false;
+                _newAssignment = new() { DueDate = DateTime.Today.AddDays(7) };
+                await LoadData();
+            }
+        });
+    }
+
+    private Badge.BadgeType GetStatusBadgeType(string status) => status switch
+    {
+        "graded" => Badge.BadgeType.Success,
+        "submitted" => Badge.BadgeType.Primary,
+        _ => Badge.BadgeType.Secondary
+    };
+}

@@ -1,0 +1,10 @@
+<span class="badge badge-@Type.ToString().ToLower()" @attributes="AdditionalAttributes">
+    @ChildContent
+</span>
+
+@code {
+    public enum BadgeType { Primary, Secondary, Success, Warning, Danger }
+    [Parameter] public BadgeType Type { get; set; } = BadgeType.Primary;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
+}

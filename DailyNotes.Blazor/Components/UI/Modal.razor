@@ -1,0 +1,82 @@
+@if (IsOpen)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="modal-container glass" @onclick:stopPropagation="true" style="max-width: @(Width)px" @attributes="AdditionalAttributes">
+            <div class="modal-header">
+                <h3 class="modal-title">@Title</h3>
+                <button class="modal-close" @onclick="Close">✕</button>
+            </div>
+            <div class="modal-content">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        animation: fade-in 0.2s ease;
+    }
+
+    .modal-container {
+        width: 90%;
+        border-radius: var(--radius);
+        overflow: hidden;
+        animation: scale-up 0.2s ease;
+    }
+
+    .modal-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: transparent;
+        border: none;
+        color: var(--color-text-muted);
+        font-size: 1.25rem;
+        cursor: pointer;
+    }
+
+    .modal-content {
+        padding: 1.5rem;
+    }
+
+    @@keyframes scale-up {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public int Width { get; set; } = 500;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

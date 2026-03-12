@@ -1,0 +1,232 @@
+@inherits AuthenticatedBaseComponent
+@page "/notes"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Notes - DailyNotes</PageTitle>
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 600;">Work Notes</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.875rem;">Daily work journal</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+        @if (TaskId.HasValue)
+        {
+            <div style="background: var(--color-bg-elevated); padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid var(--color-primary); font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>Filtering by Task: <strong>@GetTaskName(TaskId.Value)</strong></span>
+                <button class="btn-icon" style="font-size: 0.7rem;" @onclick="ClearFilter">✕</button>
+            </div>
+        }
+        <button class="btn btn-primary" @onclick="OpenNewNoteModal">+ New Note</button>
+    </div>
+</div>
+
+<div class="page-content">
+    @if (IsLoading)
+    {
+        <div style="display: flex; justify-content: center; padding: 3rem;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" style="padding: 1rem; margin-bottom: 2rem; border-radius: 8px; background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #dc3545;">
+            <h4 style="margin: 0 0 0.5rem 0;">API Error</h4>
+            <p style="margin: 0; font-size: 0.9rem;">@ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            @foreach (var note in _notes)
+            {
+                <div class="card glass" style="padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <span style="font-weight: 600; font-size: 0.9rem;">@note.NoteDate.ToString("MMM d, yyyy")</span>
+                            @if (note.WorkTaskId.HasValue)
+                            {
+                                <span style="font-size: 0.75rem; color: var(--color-primary-light);">@GetTaskName(note.WorkTaskId.Value)</span>
+                            }
+                            @if (note.TimeMinutes > 0)
+                            {
+                                <span class="badge badge-primary">@note.TimeMinutes m</span>
+                            }
+                            @if (note.IsPinned) { <span>📌</span> }
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" @onclick="() => OpenEditNoteModal(note)">Edit</button>
+                            <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" @onclick="() => DeleteNote(note.Id)">Del</button>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.95rem; line-height: 1.5; color: var(--color-text); white-space: pre-wrap;">
+                        @note.Content
+                    </div>
+                </div>
+            }
+            @if (!_notes.Any())
+            {
+                <div style="text-align: center; padding: 3rem; color: var(--color-text-muted);">
+                    No notes found.
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<Modal Title="@(_isEditing ? "Edit Note" : "New Note Entry")" @bind-IsOpen="_isNoteModalOpen">
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Date *</label>
+                <input type="date" @bind="_editingNote.NoteDate" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Linked Task</label>
+                <select @bind="_editingNote.WorkTaskId" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;">
+                    <option value="">None</option>
+                    @foreach (var task in _tasks)
+                    {
+                        <option value="@task.Id">@task.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Time (minutes)</label>
+                <input type="number" @bind="_editingNote.TimeMinutes" min="0" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Visibility</label>
+                <select @bind="_editingNote.Visibility" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;">
+                    <option value="private">Private</option>
+                    <option value="team">Team</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Content *</label>
+            <textarea @bind="_editingNote.Content" placeholder="Write your thoughts..." style="width: 100%; height: 200px; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 1rem; border-radius: 8px; resize: vertical; font-family: inherit;"></textarea>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="pin-note" @bind="_editingNote.IsPinned" />
+            <label for="pin-note" style="font-size: 0.875rem; cursor: pointer;">Pin this note</label>
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" @onclick="() => _isNoteModalOpen = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveNote">@(_isEditing ? "Update Note" : "Save Note")</button>
+    </div>
+</Modal>
+
+@code {
+    [Parameter, SupplyParameterFromQuery]
+    public int? TaskId { get; set; }
+
+    private bool _isNoteModalOpen = false;
+    private bool _isEditing = false;
+    private Note _editingNote = new();
+    private List<Note> _notes = new();
+    private List<WorkTask> _tasks = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadTasks();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            var url = "api/notes";
+            if (TaskId.HasValue) url += $"?taskId={TaskId.Value}";
+            _notes = await Http.GetFromJsonAsync<List<Note>>(url) ?? new();
+        });
+    }
+
+    private async Task LoadTasks()
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            _tasks = await Http.GetFromJsonAsync<List<WorkTask>>("api/worktasks") ?? new();
+        }, showLoader: false);
+    }
+
+    private string GetTaskName(int taskId) => _tasks.FirstOrDefault(t => t.Id == taskId)?.Name ?? $"Task #{taskId}";
+
+    private void ClearFilter()
+    {
+        Navigation.NavigateTo("/notes");
+    }
+
+    private void OpenNewNoteModal()
+    {
+        _isEditing = false;
+        _editingNote = new Note 
+        { 
+            NoteDate = DateTime.Today, 
+            Visibility = "private", 
+            WorkTaskId = TaskId 
+        };
+        _isNoteModalOpen = true;
+    }
+
+    private void OpenEditNoteModal(Note note)
+    {
+        _isEditing = true;
+        _editingNote = new Note
+        {
+            Id = note.Id,
+            NoteDate = note.NoteDate,
+            Content = note.Content,
+            WorkTaskId = note.WorkTaskId,
+            TimeMinutes = note.TimeMinutes,
+            IsPinned = note.IsPinned,
+            Visibility = note.Visibility,
+            TenantId = note.TenantId,
+            UserId = note.UserId
+        };
+        _isNoteModalOpen = true;
+    }
+
+    private async Task SaveNote()
+    {
+        if (string.IsNullOrWhiteSpace(_editingNote.Content)) return;
+
+        await ExecuteApiCallAsync(async () =>
+        {
+            HttpResponseMessage response;
+            if (_isEditing)
+            {
+                response = await Http.PutAsJsonAsync($"api/notes/{_editingNote.Id}", _editingNote);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/notes", _editingNote);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _isNoteModalOpen = false;
+                await LoadData();
+            }
+        });
+    }
+
+    private async Task DeleteNote(int id)
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            var response = await Http.DeleteAsync($"api/notes/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadData();
+            }
+        });
+    }
+}

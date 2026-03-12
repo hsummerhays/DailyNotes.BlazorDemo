@@ -1,0 +1,260 @@
+@inherits AuthenticatedBaseComponent
+@page "/tasks"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Tasks - DailyNotes</PageTitle>
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="font-size: 1.5rem; font-weight: 600;">Tasks</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.875rem;">Manage your to-dos and project items</p>
+    </div>
+    <button class="btn btn-primary" @onclick="OpenNewTaskModal">+ New Task</button>
+</div>
+
+<div class="page-content">
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+        @foreach (var filter in new[] { "Active", "Completed", "All" })
+        {
+            <button class="btn btn-secondary" 
+                    style="padding: 0.3rem 0.6rem; font-size: 0.75rem; @(_currentFilter == filter ? "background: var(--color-bg-elevated); border-color: var(--color-primary);" : "")"
+                    @onclick="() => SetFilter(filter)">
+                @filter
+            </button>
+        }
+    </div>
+    @if (IsLoading)
+    {
+        <div style="display: flex; justify-content: center; padding: 3rem;">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger" style="padding: 1rem; margin-bottom: 2rem; border-radius: 8px; background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; color: #dc3545;">
+            <h4 style="margin: 0 0 0.5rem 0;">API Error</h4>
+            <p style="margin: 0; font-size: 0.9rem;">@ErrorMessage</p>
+        </div>
+    }
+    else
+    {
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            @foreach (var task in _filteredTasks)
+            {
+                <div class="card" style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">
+                    <input type="checkbox" checked="@(task.Status == "completed")" 
+                           @onclick="() => ToggleTaskStatus(task)"
+                           class="darker-border-checkbox" style="width: 1.2rem; height: 1.2rem;" />
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="font-weight: 500; text-decoration: @(task.Status == "completed" ? "line-through" : "none"); color: @(task.Status == "completed" ? "var(--color-text-muted)" : "inherit")">
+                                @task.Name
+                            </div>
+                            @if (task.IsPinned)
+                            {
+                                <span style="font-size: 1rem;" title="Pinned">📌</span>
+                            }
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--color-text-muted); display: flex; gap: 0.5rem; align-items: center;">
+                            <span class="badge @(task.Status == "completed" ? "badge-success" : task.Status == "in-progress" ? "badge-primary" : "badge-warning")" style="font-size: 0.65rem;">
+                                @task.Status
+                            </span>
+                            @if (task.ProjectId.HasValue)
+                            {
+                                <span style="color: var(--color-primary-light);">@GetProjectName(task.ProjectId.Value)</span>
+                            }
+                            <span>•</span>
+                            <span>@(task.DueDate?.ToString("MMM d") ?? "No due date")</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" @onclick="() => JumpToNotes(task.Id)">
+                            Jump to Notes ↗
+                        </button>
+                        <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" @onclick="() => OpenEditTaskModal(task)">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+            }
+            @if (!_filteredTasks.Any())
+            {
+                <div style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
+                    No tasks found matching "@(_currentFilter)".
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<Modal Title="@(_isEditing ? "Edit Task" : "New Task")" @bind-IsOpen="_isTaskModalOpen">
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Task Name *</label>
+            <input type="text" @bind="_editingTask.Name" placeholder="What needs to be done?" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Status</label>
+                <select @bind="_editingTask.Status" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;">
+                    <option value="todo">Todo</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="backlog">Backlog</option>
+                </select>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Project *</label>
+                <select @bind="_editingTask.ProjectId" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;">
+                    <option value="">None</option>
+                    @foreach (var project in _projects)
+                    {
+                        <option value="@project.Id">@project.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Start Date</label>
+                <input type="date" @bind="_editingTask.StartDate" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Due Date</label>
+                <input type="date" @bind="_editingTask.DueDate" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px;" />
+            </div>
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--color-text-secondary);">Comments</label>
+            <textarea @bind="_editingTask.Comments" placeholder="Add more details..." rows="3" style="width: 100%; background: var(--color-bg-elevated); color: inherit; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: 8px; resize: vertical;"></textarea>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="pin-task" @bind="_editingTask.IsPinned" />
+            <label for="pin-task" style="font-size: 0.875rem; cursor: pointer;">Pin this task</label>
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 2rem;">
+        <button class="btn btn-secondary" @onclick="() => _isTaskModalOpen = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveTask">@(_isEditing ? "Update Task" : "Create Task")</button>
+    </div>
+</Modal>
+
+@code {
+    private string _currentFilter = "Active";
+    private bool _isTaskModalOpen = false;
+    private bool _isEditing = false;
+    private WorkTask _editingTask = new();
+    private List<WorkTask> _tasks = new();
+    private List<WorkTask> _filteredTasks = new();
+    private List<Project> _projects = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadProjects();
+    }
+
+    private async Task LoadData()
+    {
+        await ExecuteApiCallAsync(async () =>
+        {
+            _tasks = await Http.GetFromJsonAsync<List<WorkTask>>("api/worktasks") ?? new();
+            ApplyFilter();
+        });
+    }
+
+    private async Task LoadProjects()
+    {
+        // Don't show loader for background context load
+        await ExecuteApiCallAsync(async () =>
+        {
+            _projects = await Http.GetFromJsonAsync<List<Project>>("api/projects") ?? new();
+        }, showLoader: false);
+    }
+
+    private string GetProjectName(int projectId) => _projects.FirstOrDefault(p => p.Id == projectId)?.Name ?? $"#{projectId}";
+
+    private void SetFilter(string filter)
+    {
+        _currentFilter = filter;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (_currentFilter == "Active")
+            _filteredTasks = _tasks.Where(t => t.Status != "completed").OrderByDescending(t => t.IsPinned).ThenBy(t => t.DueDate).ToList();
+        else if (_currentFilter == "Completed")
+            _filteredTasks = _tasks.Where(t => t.Status == "completed").OrderByDescending(t => t.UpdatedAt).ToList();
+        else
+            _filteredTasks = _tasks.OrderByDescending(t => t.IsPinned).ThenBy(t => t.DueDate).ToList();
+    }
+
+    private void OpenNewTaskModal()
+    {
+        _isEditing = false;
+        _editingTask = new WorkTask { Status = "todo", StartDate = DateTime.Today };
+        _isTaskModalOpen = true;
+    }
+
+    private void OpenEditTaskModal(WorkTask task)
+    {
+        _isEditing = true;
+        _editingTask = new WorkTask
+        {
+            Id = task.Id,
+            Name = task.Name,
+            Status = task.Status,
+            Comments = task.Comments,
+            StartDate = task.StartDate,
+            DueDate = task.DueDate,
+            ProjectId = task.ProjectId,
+            IsPinned = task.IsPinned,
+            TenantId = task.TenantId,
+            UserId = task.UserId,
+            Visibility = task.Visibility
+        };
+        _isTaskModalOpen = true;
+    }
+
+    private async Task SaveTask()
+    {
+        if (string.IsNullOrWhiteSpace(_editingTask.Name)) return;
+
+        await ExecuteApiCallAsync(async () =>
+        {
+            HttpResponseMessage response;
+            if (_isEditing)
+            {
+                response = await Http.PutAsJsonAsync($"api/worktasks/{_editingTask.Id}", _editingTask);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/worktasks", _editingTask);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _isTaskModalOpen = false;
+                await LoadData();
+            }
+        });
+    }
+
+    private async Task ToggleTaskStatus(WorkTask task)
+    {
+        var newStatus = task.Status == "completed" ? "todo" : "completed";
+        await ExecuteApiCallAsync(async () =>
+        {
+            var response = await Http.PatchAsJsonAsync($"api/worktasks/{task.Id}/status", newStatus);
+            if (response.IsSuccessStatusCode)
+            {
+                task.Status = newStatus;
+                ApplyFilter();
+            }
+        }, showLoader: false); // Patch doesn't need full page reload UI
+    }
+
+    private void JumpToNotes(int taskId)
+    {
+        Navigation.NavigateTo($"/notes?taskId={taskId}");
+    }
+}

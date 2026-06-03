@@ -1,8 +1,8 @@
-using System.ComponentModel.DataAnnotations;
+using DailyNotes.Shared.Interfaces;
 
 namespace DailyNotes.Shared.Models;
 
-public class WorkDay
+public class WorkDay : IHasTenantUser
 {
     public int Id { get; set; }
     public int TenantId { get; set; }

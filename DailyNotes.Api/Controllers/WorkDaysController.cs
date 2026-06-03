@@ -1,62 +1,46 @@
-using Microsoft.AspNetCore.Mvc;
 using DailyNotes.Api.Data;
+using DailyNotes.Api.Services;
 using DailyNotes.Shared.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Identity.Web;
 
 namespace DailyNotes.Api.Controllers;
 
-[Authorize]
-[ApiController]
 [Route("api/[controller]")]
-public class WorkDaysController : ControllerBase
+public class WorkDaysController(NotesDbContext context, UserProvisioningService provisioning)
+    : ApiControllerBase(provisioning)
 {
-    private readonly NotesDbContext _context;
-
-    public WorkDaysController(NotesDbContext context)
-    {
-        _context = context;
-    }
-
-    private async Task<(int TenantId, string UserId)> GetUserContext()
-    {
-        var userId = User.GetObjectId();
-        if (string.IsNullOrEmpty(userId)) throw new UnauthorizedAccessException();
-        return await SampleDataSeeder.SeedForUser(_context, userId);
-    }
-
     [HttpGet]
-    public async Task<IEnumerable<WorkDay>> Get()
+    public async Task<ActionResult<IEnumerable<WorkDay>>> Get()
     {
-        var (tenantId, userId) = await GetUserContext();
-        return await _context.WorkDays
+        var (tenantId, userId) = await GetUserContextAsync();
+        return await context.WorkDays
             .Where(w => w.TenantId == tenantId && w.UserId == userId)
             .OrderByDescending(w => w.WorkDate)
             .ToListAsync();
     }
 
     [HttpPost]
-    public async Task<WorkDay> Post(WorkDay workDay)
+    public async Task<ActionResult<WorkDay>> Post(WorkDay workDay)
     {
-        var (tenantId, userId) = await GetUserContext();
+        var (tenantId, userId) = await GetUserContextAsync();
         workDay.TenantId = tenantId;
         workDay.UserId = userId;
         workDay.CreatedAt = DateTime.UtcNow;
         workDay.UpdatedAt = DateTime.UtcNow;
 
-        _context.WorkDays.Add(workDay);
-        await _context.SaveChangesAsync();
-        return workDay;
+        context.WorkDays.Add(workDay);
+        await context.SaveChangesAsync();
+        return CreatedAtAction(nameof(Get), new { }, workDay);
     }
 
     [HttpPost("clock-in")]
-    public async Task<WorkDay> ClockIn()
+    public async Task<ActionResult<WorkDay>> ClockIn()
     {
-        var (tenantId, userId) = await GetUserContext();
+        var (tenantId, userId) = await GetUserContextAsync();
         var today = DateTime.Today;
 
-        var workDay = await _context.WorkDays
+        var workDay = await context.WorkDays
             .FirstOrDefaultAsync(w => w.WorkDate == today && w.TenantId == tenantId && w.UserId == userId);
 
         if (workDay == null)
@@ -70,7 +54,7 @@ public class WorkDaysController : ControllerBase
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            _context.WorkDays.Add(workDay);
+            context.WorkDays.Add(workDay);
         }
         else if (workDay.TimeIn1 == null)
         {
@@ -78,7 +62,7 @@ public class WorkDaysController : ControllerBase
             workDay.UpdatedAt = DateTime.UtcNow;
         }
 
-        await _context.SaveChangesAsync();
-        return workDay;
+        await context.SaveChangesAsync();
+        return Ok(workDay);
     }
 }

@@ -1,5 +1,6 @@
 @inherits AuthenticatedBaseComponent
 @page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Globalization
 
 <PageTitle>Dashboard - DailyNotes</PageTitle>
@@ -90,22 +91,27 @@
 
         await ExecuteApiCallAsync(async () =>
         {
-            var tasks = await Http.GetFromJsonAsync<List<WorkTask>>("api/worktasks") ?? new();
+            var tasksTask = Http.GetFromJsonAsync<List<WorkTask>>("api/worktasks");
+            var workDaysTask = Http.GetFromJsonAsync<List<WorkDay>>("api/workdays");
+            var projectsTask = Http.GetFromJsonAsync<List<Project>>("api/projects");
+
+            await Task.WhenAll(tasksTask, workDaysTask, projectsTask);
+
+            var tasks = tasksTask.Result ?? new();
             _activeTasksCount = tasks.Count(t => t.Status != "completed");
             _overdueTasksCount = tasks.Count(t => t.DueDate < DateTime.Today && t.Status != "completed");
 
-            var workDays = await Http.GetFromJsonAsync<List<WorkDay>>("api/workdays") ?? new();
+            var workDays = workDaysTask.Result ?? new();
             var today = workDays.FirstOrDefault(w => w.WorkDate.Date == DateTime.Today);
             _isClockedIn = today?.TimeIn1 != null && today.TimeOut1 == null;
-            
+
             if (today?.TimeIn1 != null)
             {
                 var end = today.TimeOut1 ?? DateTime.Now;
                 _hoursToday = (end - today.TimeIn1.Value).TotalHours;
             }
 
-            var projects = await Http.GetFromJsonAsync<List<Project>>("api/projects") ?? new();
-            _recentProjects = projects.OrderByDescending(p => p.CreatedAt).Take(3).ToList();
+            _recentProjects = (projectsTask.Result ?? new()).OrderByDescending(p => p.CreatedAt).Take(3).ToList();
         });
     }
 }

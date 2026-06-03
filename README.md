@@ -66,7 +66,33 @@ The project includes a `.github/workflows/dotnet.yml` workflow that automaticall
 
 ## 🔍 Health & Diagnostics
 - **Health Endpoints**: Available at `/health` on both the API and Blazor apps.
-- **Diagnostics Page**: A specialized production diagnostic tool is available at `/diagnostics` within the Blazor application to verify runtime configuration.
+- **Diagnostics Page**: A specialized production diagnostic tool is available at `/diagnostics` within the Blazor application to verify runtime configuration (requires authentication).
+
+## 🔐 Blazor Server Authentication Flow
+
+Blazor Server's split SSR + SignalR architecture creates a non-obvious token problem: `HttpContext` (and therefore the OIDC access token) is only available during the initial server-side render, **not** during the interactive SignalR circuit that follows.
+
+This project solves it with two scoped services registered per-circuit:
+
+1. **`BlazorUserContext`** — a simple property bag holding the `ClaimsPrincipal` and the raw `access_token` string.
+2. **`ApiAuthorizationMessageHandler`** (a `DelegatingHandler`) — attached to the `DailyNotesApi` `HttpClient`. On every outgoing request it reads the token from `BlazorUserContext` and adds the `Authorization: Bearer` header.
+
+**How the token is captured:**
+
+`AuthenticatedBaseComponent.EnsureUserContextAsync()` runs before every API call. During the SSR phase, `IHttpContextAccessor.HttpContext` is non-null and carries the access token written by `SaveTokens = true` in the OIDC options. The component reads that token and stores it in `BlazorUserContext.ApiAccessToken`. Once set, it persists for the lifetime of the circuit and is reused by the `DelegatingHandler` for all subsequent calls over SignalR.
+
+If the token is absent (e.g., first interactive render before SSR has stored it), the handler falls back to `ITokenAcquisition`, which works when the MSAL distributed cache is warm.
+
+## ☁️ Azure Configuration Notes
+
+### CORS
+The API's allowed origins are configured under `Cors:AllowedOrigins` in `appsettings.json`. For production, set the Azure App Service environment variable:
+```
+Cors__AllowedOrigins__0 = https://<your-blazor-app>.azurewebsites.net
+```
+
+### HTTPS
+HTTPS termination is handled by Azure App Service's front-end. `UseHttpsRedirection` is intentionally disabled in the API to avoid redirect loops behind the proxy.
 
 ---
 *Created and maintained as part of the DailyNotes showcase project.*

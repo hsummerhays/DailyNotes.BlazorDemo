@@ -1,6 +1,8 @@
+using DailyNotes.Shared.Interfaces;
+
 namespace DailyNotes.Shared.Models;
 
-public class WorkTask
+public class WorkTask : IHasTenantUser
 {
     public int Id { get; set; }
     public int TenantId { get; set; }

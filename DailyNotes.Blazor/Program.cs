@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,10 @@ else
             builder.Configuration.GetSection("AzureAd").Bind(options);
             options.ClientSecret = builder.Configuration["AzureAd:ClientSecret"];
 
+            // SaveTokens stores the access_token in the authentication session
+            // so we can retrieve it via HttpContext.GetTokenAsync in SSR phase
+            options.SaveTokens = true;
+
             options.Events.OnAuthenticationFailed = context =>
             {
                 Console.WriteLine($"Authentication Failed: {context.Exception.Message}");
@@ -68,11 +73,13 @@ else
     builder.Services.AddMicrosoftIdentityConsentHandler();
 }
 
+
 builder.Services.AddRazorPages();
 builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -83,16 +90,19 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddHeaderPropagation(options => options.Headers.Add("Authorization"));
 
+// Register the Blazor Server token bridge services
+builder.Services.AddScoped<BlazorUserContext>();
+builder.Services.AddScoped<TokenProvider>();
+builder.Services.AddScoped<ApiAuthorizationMessageHandler>();
+
+
 builder.Services.AddHttpClient("DailyNotesApi", client =>
 {
-    var apiBaseAddress = builder.Configuration["DailyNotesApi:BaseAddress"] ?? "http://localhost:5251/";
+    var apiBaseAddress = builder.Configuration["DailyNotesApi:BaseAddress"] ?? builder.Configuration["DailyNotesApi__BaseAddress"] ?? "http://localhost:5251/";
     Console.WriteLine($"[DEBUG] Blazor calling API at: {apiBaseAddress}");
     client.BaseAddress = new Uri(apiBaseAddress);
 })
-.AddMicrosoftIdentityUserAuthenticationHandler("DailyNotesApi", options =>
-{
-    options.Scopes = $"api://{azureAdConfig["ClientId"]}/access_as_user";
-});
+.AddHttpMessageHandler<ApiAuthorizationMessageHandler>();
 
 // Provide simpler injection for components
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("DailyNotesApi"));

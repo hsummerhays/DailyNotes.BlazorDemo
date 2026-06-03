@@ -1,5 +1,5 @@
 @description('The location of the resources.')
-param location string = 'eastus'
+param location string = resourceGroup().location
 
 @description('The name of the App Service Plan.')
 param appServicePlanName string = 'app-dn-plan-hsh8'
@@ -40,8 +40,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: appServicePlanName
   location: location
   sku: {
-    name: 'B1'
-    tier: 'Basic'
+    name: 'F1'
+    tier: 'Free'
   }
 }
 

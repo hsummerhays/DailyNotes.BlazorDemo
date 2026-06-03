@@ -683,3 +683,20 @@ LogFiles/
 *.log
 *.zip
 !README.md
+
+# Azure deployment artifacts and downloaded diagnostic files
+pub-api/
+pub-blazor/
+blazor-logs*/
+blazor-logs.zip
+blazor-appsettings.json
+blazor-settings.txt
+kv-props.txt
+last-events.txt
+status.txt
+app.json
+*.txt
+!README.md
+
+# Agents
+.agents/

@@ -8,12 +8,12 @@ A modern, full-stack personal management application built with **.NET 10.0**, f
 
 ## 🚀 Project Architecture
 
-The solution follows a clean, decoupled architecture:
+The solution uses the XML-based solution format [DailyNotes.BlazerDemo.slnx](./DailyNotes.BlazerDemo.slnx) and follows a clean, decoupled architecture:
 
-- **DailyNotes.Blazor**: An Interactive Server-side Blazor application providing the user interface, utilizing Microsoft Identity for authentication.
-- **DailyNotes.Api**: A high-performance RESTful API managing data persistence and business logic.
-- **DailyNotes.Shared**: A common library containing shared data models and constants.
-- **DailyNotes.Tests**: A suite of xUnit tests for verifying configuration and core logic.
+- **[DailyNotes.Blazor](./DailyNotes.Blazor)**: An Interactive Server-side Blazor application providing the user interface, utilizing Microsoft Identity for authentication.
+- **[DailyNotes.Api](./DailyNotes.Api)**: A high-performance RESTful API managing data persistence and business logic.
+- **[DailyNotes.Shared](./DailyNotes.Shared)**: A common library containing shared data models and constants.
+- **[DailyNotes.Tests](./DailyNotes.Tests)**: A suite of xUnit tests for verifying configuration and core logic.
 
 ## 🛠️ Technology Stack
 
@@ -21,7 +21,7 @@ The solution follows a clean, decoupled architecture:
 - **Backend**: ASP.NET Core API, Entity Framework Core.
 - **Identity**: Microsoft Identity Web (Azure AD / Microsoft Entra ID).
 - **Database**: SQL Server (Production) / SQLite (Local Development).
-- **Deployment**: Bicep (Infrastructure as Code), GitHub Actions (CI/CD).
+- **Deployment**: Bicep (Infrastructure as Code), PowerShell Deployment Scripts, GitHub Actions (CI/CD).
 - **Runtime**: .NET 10.0 Core.
 
 ## 💻 Local Development
@@ -32,14 +32,18 @@ The solution follows a clean, decoupled architecture:
 
 ### Setup
 1. Clone the repository.
-2. Initialize the local database:
+2. Initialize the local SQLite database for the API:
    ```powershell
    dotnet ef database update --project DailyNotes.Api
    ```
 3. Configure Azure AD (optional for local):
    - By default, the app uses a **Mock Authentication** mode in `Development` environments if no Client ID is provided.
-4. Run the solution:
+4. Run the API and Blazor applications. You can run both concurrently using:
    ```powershell
+   # Run the Backend API (default port 5251)
+   dotnet run --project DailyNotes.Api
+
+   # Run the Blazor Frontend
    dotnet run --project DailyNotes.Blazor
    ```
 
@@ -48,18 +52,43 @@ The solution follows a clean, decoupled architecture:
 This project is fully automated for Azure deployment using a Bicep-based infrastructure.
 
 ### Infrastructure Components
-- **App Service Plan**: Basic (B1) Linux/Windows plan.
+- **App Service Plan**: Free (F1) Windows plan (defined in [deploy.bicep](./deploy.bicep)).
 - **Web Apps**: Two separate instances for the API and Blazor frontend.
 - **SQL Database**: Azure SQL (Basic tier) with automated firewall rules.
+- **Key Vault**: Secure storage for application secrets (such as the Azure AD Client Secret).
 
-### Provisioning
-Deploy the infrastructure using the Azure CLI:
+### Automated Provisioning & Deployment
+We provide PowerShell automation scripts in the root directory to provision resources and deploy the code:
+
+1. **[SetupAzureForDailyNotesRazorDemo.ps1](./SetupAzureForDailyNotesRazorDemo.ps1)**:
+   - Registers required Azure resource providers (`Microsoft.Web`, `Microsoft.Storage`, etc.).
+   - Creates a fresh Resource Group (`rg-BlazorFullStack-CentralUs` in `centralus`).
+   - Automatically registers the application in Azure AD (Microsoft Entra ID) and generates a Client Secret.
+   - Triggers the [deploy.bicep](./deploy.bicep) deployment.
+   
+   To run this script:
+   ```powershell
+   .\SetupAzureForDailyNotesRazorDemo.ps1
+   ```
+
+2. **[DeployToAzure.ps1](./DeployToAzure.ps1)**:
+   - Publishes both the API and Blazor applications in Release mode.
+   - Packages the outputs into ZIP archives.
+   - Deploys the ZIP archives directly to Azure Web Apps using the Azure CLI.
+   
+   To deploy updates:
+   ```powershell
+   .\DeployToAzure.ps1
+   ```
+
+### Manual CLI Provisioning
+Alternatively, deploy the Bicep infrastructure manually using the Azure CLI:
 ```powershell
-az deployment group create --resource-group rg-dailynotes-demo --template-file deploy.bicep --parameters sqlAdminPassword="<your-password>" azureAdClientSecret="<your-secret>"
+az deployment group create --resource-group rg-BlazorFullStack-CentralUs --template-file deploy.bicep --parameters sqlAdminPassword="<your-password>" azureAdClientSecret="<your-secret>" azureAdClientId="<client-id>" azureAdTenantId="<tenant-id>"
 ```
 
 ### GitHub Actions (CI/CD)
-The project includes a `.github/workflows/dotnet.yml` workflow that automatically:
+The project includes a [.github/workflows/dotnet.yml](./.github/workflows/dotnet.yml) workflow that automatically:
 1. Rebuilds and tests the application on every push to `main`.
 2. Publishes and deploys code artifacts to Azure using **Publish Profiles**.
 3. Utilizes `WEBSITE_RUN_FROM_PACKAGE=1` for immutable and reliable execution.

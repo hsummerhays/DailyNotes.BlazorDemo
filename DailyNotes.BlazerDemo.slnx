@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="DailyNotes.Api/DailyNotes.Api.csproj" />
+  <Project Path="DailyNotes.Blazor/DailyNotes.Blazor.csproj" />
+  <Project Path="DailyNotes.Shared/DailyNotes.Shared.csproj" />
   <Project Path="DailyNotes.Tests/DailyNotes.Tests.csproj" />
 </Solution>
